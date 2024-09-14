@@ -5,7 +5,6 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
-
     healthcheck:
       test: ["CMD-SHELL", "rabbitmqctl status"]
       interval: 30s
@@ -16,6 +15,11 @@ services:
     image: redis:latest
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   entry-service:
     build: ./entry-service
@@ -23,6 +27,11 @@ services:
       rabbitmq:
         condition: service_healthy
     restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   exit-service:
     build: ./exit-service
@@ -30,16 +39,33 @@ services:
       rabbitmq:
         condition: service_healthy
     restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:8081/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   backend-service:
     build: ./backend-service
     depends_on:
       rabbitmq:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: on-failure
-      - redis
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   python-server:
     build: ./python-server
     ports:
       - "5000:5000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:5000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
